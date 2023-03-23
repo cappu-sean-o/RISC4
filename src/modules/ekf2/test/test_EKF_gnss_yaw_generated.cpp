@@ -123,9 +123,10 @@ TEST(GnssYawFusionGenerated, SympyVsSymforce)
 {
 	const float R_YAW = sq(0.3f);
 
-	const float yaw_offset = 1.5f;
+	const float yaw_offset = M_PI_F / 8.f;
+	const float yaw = M_PI_F;
 
-	const Quatf q(Eulerf(M_PI_F / 2.f, M_PI_F / 3.f, M_PI_F));
+	const Quatf q(Eulerf(M_PI_F / 4.f, M_PI_F / 3.f, M_PI_F));
 
 	Vector24f state_vector{};
 	state_vector(0) = q(0);
@@ -149,17 +150,18 @@ TEST(GnssYawFusionGenerated, SympyVsSymforce)
 	// K isn't generated from symbolic anymore to save flash space
 	Vector24f K_symforce = P * H_symforce / innov_var_symforce;
 
-	DiffRatioReport report = computeDiffRatioVector24f(H_sympy, H_symforce);
-	EXPECT_LT(report.max_diff_fraction, 1e-5f) << "H max diff fraction = " <<
-			report.max_diff_fraction <<
-			" location index = " << report.max_row << " sympy = " << report.max_v1 << " symforce = " << report.max_v2;
+	// The derivation is slightly due to the different quat -> R used in Symforce
+	// A small difference from the old derivation is then expected
+	EXPECT_TRUE(K_symforce.isAllFinite());
+	EXPECT_LT((K_symforce - K_sympy).max(), 0.01f);
+	EXPECT_TRUE(H_symforce.isAllFinite());
+	EXPECT_LT((H_symforce - H_sympy).max(), 0.1f);
+	EXPECT_GT(innov_var_symforce, 50.f);
+	EXPECT_LT(innov_var_symforce, 60.f);
+	EXPECT_NEAR(innov_var_sympy, innov_var_symforce, 0.5f);
 
-	report = computeDiffRatioVector24f(K_sympy, K_symforce);
-	EXPECT_LT(report.max_diff_fraction, 1e-5f) << "K max diff fraction = " <<
-			report.max_diff_fraction <<
-			" location index = " << report.max_row << " sympy = " << report.max_v1 << " symforce = " << report.max_v2;
-
-	EXPECT_NEAR(innov_var_sympy, innov_var_symforce, 1e-5f);
+	// The predicted yaw is not exactly yaw + offset because roll and pitch are non-zero, but it's close to that
+	EXPECT_NEAR(meas_pred_symforce, wrap_pi(yaw + yaw_offset), 0.05f);
 }
 
 TEST(GnssYawFusionGenerated, SingularityPitch90)
