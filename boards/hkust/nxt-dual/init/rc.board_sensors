@@ -14,3 +14,6 @@ bmi088 -s -b 4 -G -R 2 start
 
 # internal baro
 spl06 -X -a 0x77 start
+
+# Optical Flow
+paa3905 -s -b 3 -Y 180 start
